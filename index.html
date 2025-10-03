@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SkyTap</title>
+  <title>Husn</title>
   <style>
     :root{--bg:#8bd3ff;--ground:#2e7d32;--pipe:#1b5e20;--ball:#ffdd57}
     html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);-webkit-tap-highlight-color:transparent}
@@ -22,11 +22,11 @@
     <div class="overlay ui" id="scoreUI">Score: 0</div>
     <canvas id="game" width="480" height="800"></canvas>
     <div class="centerBox" id="menu">
-      <h1 style="margin:0;color:#013">SkyTap</h1>
+      <h1 style="margin:0;color:#013">Husn</h1>
       <p class="small">Tap / Click / Press Space to fly — survive as long as you can</p>
       <div class="btn" id="startBtn">Play</div>
       <p class="small" id="best">Best: 0</p>
-      <p class="small" style="margin-top:6px;opacity:.85">Built for free — host on GitHub Pages or itch.io</p>
+      <p class="small" style="margin-top:6px;opacity:.85">get better loser</p>
     </div>
     <div class="centerBox" id="gameOver" style="display:none">
       <h2 style="margin:0;color:#013">Game Over</h2>
@@ -35,7 +35,10 @@
       <p class="small" id="shareHint" style="margin-top:8px">Share this link to challenge friends!</p>
     </div>
   </div>
-  <footer>SkyTap — free prototype</footer>
+  <footer><a href="https://instagram.com/solejahusn" target="_blank" style="color: white; text-decoration: none;">
+    follow my insta @solejahusn
+  </a>
+  </footer>
 
 <script>
 (() => {
@@ -62,7 +65,7 @@
   let gapSize = 170;
   let speed = 2.6;
   let score = 0;
-  let highScore = +localStorage.getItem('skytap_best') || 0;
+  let highScore = +localStorage.getItem('husn_best') || 0;
   bestEl.textContent = 'Best: ' + highScore;
 
   // Controls
@@ -98,7 +101,7 @@
     document.getElementById('finalScore').textContent = 'Score: ' + Math.floor(score);
     gameOver.style.display = 'block';
     // Save high score
-    if(Math.floor(score) > highScore){ highScore = Math.floor(score); localStorage.setItem('skytap_best', highScore); bestEl.textContent = 'Best: ' + highScore;}
+    if(Math.floor(score) > highScore){ highScore = Math.floor(score); localStorage.setItem('husn_best', highScore); bestEl.textContent = 'Best: ' + highScore;}
   }
 
   function spawnPipe(){
@@ -239,3 +242,4 @@
 </script>
 </body>
 </html>
+
