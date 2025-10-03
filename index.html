@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SkyTap</title>
+  <style>
+    :root{--bg:#8bd3ff;--ground:#2e7d32;--pipe:#1b5e20;--ball:#ffdd57}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);-webkit-tap-highlight-color:transparent}
+    #gameWrap{display:flex;align-items:center;justify-content:center;height:100%}
+    canvas{background:linear-gradient(#88d6ff,#c7f0ff);border-radius:12px;box-shadow:0 8px 30px rgba(10,30,60,.15)}
+    .overlay{position:absolute;left:0;right:0;text-align:center;padding-top:14px;font-weight:700;color:#034}
+    .ui{position:absolute;top:14px;left:14px;color:#033;font-weight:700;padding:6px 10px;background:rgba(255,255,255,0.6);border-radius:10px}
+    .centerBox{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .btn{display:inline-block;padding:10px 18px;border-radius:8px;background:#ff8a65;color:white;font-weight:700;cursor:pointer;margin-top:12px}
+    .small{font-size:14px;color:#023;opacity:.9}
+    footer{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:12px;color:#023;opacity:.7}
+  </style>
+</head>
+<body>
+  <div id="gameWrap">
+    <div class="overlay ui" id="scoreUI">Score: 0</div>
+    <canvas id="game" width="480" height="800"></canvas>
+    <div class="centerBox" id="menu">
+      <h1 style="margin:0;color:#013">SkyTap</h1>
+      <p class="small">Tap / Click / Press Space to fly — survive as long as you can</p>
+      <div class="btn" id="startBtn">Play</div>
+      <p class="small" id="best">Best: 0</p>
+      <p class="small" style="margin-top:6px;opacity:.85">Built for free — host on GitHub Pages or itch.io</p>
+    </div>
+    <div class="centerBox" id="gameOver" style="display:none">
+      <h2 style="margin:0;color:#013">Game Over</h2>
+      <p class="small" id="finalScore">Score: 0</p>
+      <div class="btn" id="retryBtn">Try Again</div>
+      <p class="small" id="shareHint" style="margin-top:8px">Share this link to challenge friends!</p>
+    </div>
+  </div>
+  <footer>SkyTap — free prototype</footer>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const scoreUI = document.getElementById('scoreUI');
+  const menu = document.getElementById('menu');
+  const gameOver = document.getElementById('gameOver');
+  const startBtn = document.getElementById('startBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const bestEl = document.getElementById('best');
+  const finalScore = document.getElementById('finalScore');
+  const WIDTH = canvas.width;
+  const HEIGHT = canvas.height;
+
+  // Game state
+  let running = false;
+  let ball = { x: 100, y: HEIGHT/2, r: 16, vy: 0 };
+  const gravity = 0.65;
+  const flapPower = -10.5;
+  let pipes = [];
+  let spawnTimer = 0;
+  let spawnInterval = 90; // frames
+  let gapSize = 170;
+  let speed = 2.6;
+  let score = 0;
+  let highScore = +localStorage.getItem('skytap_best') || 0;
+  bestEl.textContent = 'Best: ' + highScore;
+
+  // Controls
+  function flap(){ if(!running) return; ball.vy = flapPower; }
+  window.addEventListener('keydown', e=>{ if(e.code === 'Space'){ e.preventDefault(); if(!running){ startGame(); } flap(); }});
+  canvas.addEventListener('mousedown', e=>{ if(!running){ startGame(); } flap(); });
+  canvas.addEventListener('touchstart', e=>{ e.preventDefault(); if(!running){ startGame(); } flap(); }, {passive:false});
+
+  startBtn.onclick = startGame;
+  retryBtn.onclick = resetGame;
+
+  function resetGame(){
+    menu.style.display = 'none';
+    gameOver.style.display = 'none';
+    spawnTimer = 0;
+    pipes = [];
+    score = 0;
+    speed = 2.6;
+    gapSize = 170;
+    ball = { x:100, y:HEIGHT/2, r:16, vy:0 };
+    running = true;
+    loop();
+  }
+
+  function startGame(){
+    menu.style.display = 'none';
+    gameOver.style.display = 'none';
+    resetGame();
+  }
+
+  function endGame(){
+    running = false;
+    document.getElementById('finalScore').textContent = 'Score: ' + Math.floor(score);
+    gameOver.style.display = 'block';
+    // Save high score
+    if(Math.floor(score) > highScore){ highScore = Math.floor(score); localStorage.setItem('skytap_best', highScore); bestEl.textContent = 'Best: ' + highScore;}
+  }
+
+  function spawnPipe(){
+    const minTop = 60;
+    const maxTop = HEIGHT - 60 - gapSize - 120; // keep room for ground
+    const top = Math.random() * (maxTop - minTop) + minTop;
+    pipes.push({ x: WIDTH + 20, top: top, gap: gapSize, passed: false });
+  }
+
+  function update(){
+    if(!running) return;
+    // physics
+    ball.vy += gravity;
+    ball.y += ball.vy;
+
+    // spawn
+    spawnTimer++;
+    if(spawnTimer > spawnInterval){
+      spawnTimer = 0;
+      spawnPipe();
+      // slowly increase difficulty
+      if(spawnInterval > 60) spawnInterval -= 1;
+      if(gapSize > 120) gapSize -= 0.6;
+      speed += 0.006;
+    }
+
+    // update pipes
+    for(let i=pipes.length-1;i>=0;i--){
+      pipes[i].x -= speed;
+      if(!pipes[i].passed && pipes[i].x + 40 < ball.x){ pipes[i].passed = true; score += 1; }
+      // remove off screen
+      if(pipes[i].x < -80) pipes.splice(i,1);
+    }
+
+    // collisions (ball with pipes)
+    for(let p of pipes){
+      const pipeW = 60;
+      if(ball.x + ball.r > p.x && ball.x - ball.r < p.x + pipeW){
+        // within x-range, check y overlap
+        if(ball.y - ball.r < p.top || ball.y + ball.r > p.top + p.gap){
+          // collision
+          endGame();
+        }
+      }
+    }
+
+    // ground / ceiling
+    if(ball.y - ball.r < 0 || ball.y + ball.r > HEIGHT - 30){
+      endGame();
+    }
+
+    // score UI
+    scoreUI.textContent = 'Score: ' + Math.floor(score);
+  }
+
+  function draw(){
+    // background
+    ctx.fillStyle = '#8bd3ff';
+    ctx.fillRect(0,0,WIDTH,HEIGHT);
+
+    // sun
+    ctx.beginPath();
+    ctx.fillStyle = '#ffd966';
+    ctx.arc(WIDTH - 70, 70, 40, 0, Math.PI*2);
+    ctx.fill();
+
+    // clouds (simple)
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    drawCloud(120,80,1.2);
+    drawCloud(230,120,0.9);
+    drawCloud(60,150,0.7);
+
+    // pipes (obstacles)
+    for(let p of pipes){
+      ctx.fillStyle = '#1b5e20';
+      const pipeW = 60;
+      // top pipe
+      ctx.fillRect(p.x, 0, pipeW, p.top);
+      // bottom pipe
+      ctx.fillRect(p.x, p.top + p.gap, pipeW, HEIGHT - (p.top + p.gap) - 30);
+      // pipe cap (rounded)
+      ctx.fillStyle = '#134b1a';
+      ctx.fillRect(p.x-6, p.top-10, pipeW+12, 10);
+      ctx.fillRect(p.x-6, p.top + p.gap + (HEIGHT - (p.top + p.gap) - 30) - 0, pipeW+12, 10);
+    }
+
+    // ground
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillRect(0, HEIGHT-30, WIDTH, 30);
+
+    // ball (player)
+    ctx.beginPath();
+    ctx.fillStyle = '#ffdd57';
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+    ctx.fill();
+    // ball eye
+    ctx.beginPath();
+    ctx.fillStyle = '#222';
+    ctx.arc(ball.x + 6, ball.y - 4, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    // score big in center top
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.font = '700 46px system-ui, Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.floor(score), WIDTH/2, 60);
+  }
+
+  function drawCloud(x,y,scale){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(scale,scale);
+    ctx.beginPath();
+    ctx.arc(0,0,22,Math.PI*0.5,Math.PI*1.5);
+    ctx.arc(30,-10,30,Math.PI*1,Math.PI*1.85);
+    ctx.arc(60,0,22,Math.PI*1.5,Math.PI*0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function loop(){
+    update();
+    draw();
+    if(running) requestAnimationFrame(loop);
+  }
+
+  // initial render
+  draw();
+
+  // show menu if not playing
+  menu.style.display = 'block';
+  gameOver.style.display = 'none';
+
+  // small instructions for hosting / ads:
+  // To add ads later, place your AdSense script right before the closing </body> and show ad containers in the menu/footer.
+})();
+</script>
+</body>
+</html>
